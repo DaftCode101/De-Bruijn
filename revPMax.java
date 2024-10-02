@@ -1,7 +1,7 @@
 import java.util.ArrayList;
 
 /**
- * Java implementation of combinatoric "game" for De Bruijn sequence construction.
+ * Java implementation of a shift rule for De Bruijn sequence construction.
  * Paper: De Bruijn Sequences: From Games to Shift-Rules to a Proof of the Fredericksen-
  * Kessler-Mairoana Theroem.
  *
