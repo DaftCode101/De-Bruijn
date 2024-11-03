@@ -1,5 +1,6 @@
 import java.util.Scanner;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 /**
  * Shift rule game where "Alice" can play any letter.
@@ -13,6 +14,7 @@ public class shiftGame {
 
     private int k = 2;
     private int n = 2;
+    private boolean change = false;
     private ArrayList<ArrayList<Integer>> sequence;
 
     public static void main(String[] args) {
@@ -43,7 +45,15 @@ public class shiftGame {
         }
         if(yesno.equals("yes") || yesno.equals("y")) {
             boolean contained = b_increment();
-            if(contained) {
+            if(change && contained) {
+                boolean c = a(input);
+                if(c) {
+                    input.close();
+                    return;
+                }
+            }
+            else if(contained) {
+                System.out.println("Contained");
                 System.out.println("Bob wins");
                 input.close();
                 return;
@@ -64,6 +74,19 @@ public class shiftGame {
         input.close();
     }
 
+    private boolean isTie(ArrayList<Integer> nextWord) {
+        boolean tie = true;
+        HashSet<Integer> set = new HashSet<Integer>();
+        for (Integer x : nextWord) {
+            if(x != 0 || set.contains(x)) {
+                tie = false;
+            }
+            set.add(x);
+        }
+        tie = (tie && sequence.size() - 1 == (int)Math.round(Math.pow((double)(k - 1), (double)n)));
+        return tie;
+    }
+
     private boolean a(Scanner input) {
         System.out.println("Alice plays (y/n)?");
         String yesno = input.next().toLowerCase();
@@ -75,18 +98,17 @@ public class shiftGame {
             int shiftToken = input.nextInt();
             if(shiftToken < 0 || shiftToken > k - 1) {
                 System.out.println("Letter out of bounds");
+                return false;
             }
-            else {
-                try {
+            try {
                 boolean contained = a_shift(shiftToken);
                 if(contained) {
                     return true;
                 }
-                }
-                catch(Exception e) {
-                    a(input);
-                    return false;
-                }
+            }
+            catch(Exception e) {
+                a(input);
+                return false;
             }
         }
         else if(yesno.equals("no") || yesno.equals("n")) {
@@ -107,8 +129,12 @@ public class shiftGame {
     private boolean b_increment() {
         ArrayList<Integer> nextWord = copy(sequence.getLast());
         if(!(nextWord.getFirst() < k - 1)) {
-            nextWord.removeFirst();
-            nextWord.add(k - 1);
+            change = true;
+            for (Integer x : nextWord) {
+                System.out.print(x);
+            }
+            System.out.println();
+            return true;
         }
         else {
             nextWord.add(nextWord.removeFirst() + 1);
@@ -124,7 +150,11 @@ public class shiftGame {
             }
         }
         System.out.println();
+        // if(isTie(nextWord)) {
+        //     return true;
+        // }
         sequence.add(nextWord);
+        
         return end;
     }
 
@@ -139,6 +169,10 @@ public class shiftGame {
             System.out.print(x);
         }
         System.out.println();
+        if(isTie(nextWord)) {
+            System.out.println("Tie");
+            return true;
+        }
         sequence.add(nextWord);
         return false;
     }
@@ -150,6 +184,12 @@ public class shiftGame {
         ArrayList<Integer> nextWord = copy(sequence.getLast());
         nextWord.removeFirst();
         nextWord.add(next);
+
+        if(isTie(nextWord)) {
+            System.out.println("Tie :D");
+            return true;
+        }
+        
         if(sequence.contains(nextWord)) {
             System.out.println("Bob wins");
             return true;
@@ -158,7 +198,9 @@ public class shiftGame {
             System.out.print(x);
         }
         System.out.println();
+        
         sequence.add(nextWord);
+        
         return false;
     }
 
