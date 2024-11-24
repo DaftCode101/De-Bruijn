@@ -2,12 +2,14 @@
     Visualizer for de Bruijn graphs. Contains logic for dispaying
     a specific layer of a de Bruijn "onion".
     Author: Benjamin Keefer
-    Version: November 12th, 2024
+    Version: November 24th, 2024
 """
 import networkx as nx
 import matplotlib.pyplot as plt
 edges = []
 sequence = []
+adjacency = {}
+num = 0
 k = 2
 n = 2
 
@@ -41,33 +43,10 @@ def de_bruijn(k_val: int, n_val: int):
         sequence.append(s)
         s = shift(s)
 
-def main():
-    global k, n
-    G = nx.DiGraph()
-    # Gathers parameters for the sequence
-    lay_val = 2
-    n = int(input("Enter n: "))
-    k = int(input("Enter k: "))
-    lay_bool = str(input("Lay? (y/n) "))
-    lay_bool = lay_bool.lower()
-    # Generates de Bruijn sequence
-    de_bruijn(k, n)
-    # Updates sequence according to lay
-    if(lay_bool == "y"):
-        lay_val = int(input("Enter lay value: "))
-        lay(lay_val)
-    # Gets edge pairs from sequence
-    load_edges()
-    # Draws de Bruijn graph
-    G.add_edges_from(edges)
-    try:
-        nx.draw_planar(G, with_labels=True)
-    except:
-        nx.draw_spring(G, with_labels=True)
-    plt.show()
-
 # Generates edge pairs from the de Bruijn sequence
 def load_edges():
+    global edges
+    edges = []
     for word in sequence:
         for other_word in sequence:
             add = True
@@ -81,7 +60,7 @@ def load_edges():
 def lay(x : int):
     global sequence
     # Checks validity of lay value
-    if(x >= k or x < 1):
+    if(x >= k or x < 0):
         print("Invalid lay value")
         return
     # Adds words in lay to seq
@@ -93,12 +72,109 @@ def lay(x : int):
                 in_word = True
         if(in_word):
             sub_seq.append(word)
-    # Adds 0^(k-1) to the sequence
-    start = []
-    for i in range(n):
-        start.append(0)
-    sub_seq.append(start)
     sequence = sub_seq
 
+
+# Removes edges that start or end with 0^(n) because they're not needed for lay computation
+def remove_zero_edges() -> list:
+    global sequence
+    removed = []
+    zero = ""
+    for i in range(n):
+        zero += str(0)
+
+    for word in edges:
+        if not (word[0] == zero or word[1] == zero):
+            removed.append(word)
+   
+    sequence = removed
+    return removed
+
+# Converts list of graph edges into a dictionary of adjacency lists
+def adjacency_lists(edges):
+    for edge in edges:
+        if(edge[0] in adjacency):
+            adjacency[edge[0]].append(edge[1])
+        else:
+            adjacency[edge[0]] = [edge[1]]
+
+# Computes the number of hamiltonian paths in a layer of an onion de Bruijn sequence
+# If print_paths is True it will print those paths, otherwise it won't
+def num_of_paths(start, end, print_paths) -> int:
+    global num
+    all_paths = []
+    
+    visited = {}
+    for edge in list(adjacency.keys()):
+        visited[edge] = False
+
+    def dfs(current_path, current_vertex, print_paths):
+        global num
+        if current_vertex == end and len(current_path) == len(visited):
+            if(print_paths):
+                all_paths.append(current_path[:])
+            num = num + 1
+            return
+        visited[current_vertex] = True
+        for neighbor in adjacency[current_vertex]:
+            if not visited[neighbor]:
+                current_path.append(neighbor)
+                dfs(current_path, neighbor, print_paths)
+                current_path.pop()
+        visited[current_vertex] = False
+    
+    dfs([start], start, print_paths)
+    if(print_paths):
+        for path in all_paths:
+            print(path)
+    return num
+
+def main():
+    global k, n
+    G = nx.DiGraph()
+    # Gathers parameters for the sequence
+    n = int(input("Enter n: "))
+    k = int(input("Enter k: "))
+    lay_val = k - 1
+    lay_bool = str(input("Lay? (y/n) "))
+    lay_bool = lay_bool.lower()
+    # Generates de Bruijn sequence
+    de_bruijn(k, n)
+    # Updates sequence according to lay
+    if(lay_bool == "y"):
+        lay(lay_val)
+
+    # Makes layer from the de Bruijn sequence
+    load_edges()
+    remove_zero_edges()
+    adjacency_lists(sequence)
+
+    start_val = lay_val
+    end_val = lay_val
+    if lay_val == 0:
+        start_val = 1
+        end_val = k - 1
+    start = str(start_val)
+    end = ""
+    for i in range(n - 1):
+        start += "0"
+        end += "0"
+    end += str(end_val)
+    print("start: " + start)
+    print("end: " + end)
+
+    print("Number of hamiltonian paths: " + str(num_of_paths(start, end, False)))
+
+    # Draws de Bruijn graph
+    # G.add_edges_from(sequence)
+    # try:
+    #     nx.draw_planar(G, with_labels=True)
+    # except:
+    #     nx.draw_spring(G, with_labels=True)
+    # plt.show()
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except:
+        print("Invalid input")
