@@ -1,6 +1,7 @@
 """
-    Visualizer for de Bruijn graphs. Contains logic for dispaying
-    a specific layer of a de Bruijn "onion".
+    Visualizer for de Bruijn graphs. Contains functions for dispaying
+    a specific layer of a de Bruijn "onion" as well as computing the
+    number of hamiltonian paths in that layer.
     Author: Benjamin Keefer
     Version: November 24th, 2024
 """
