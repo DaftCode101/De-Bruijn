@@ -9,7 +9,7 @@ import time as t
     a specific (onion) layer of a de Bruijn graph as well as efficiently
     computing number of hamiltonian paths in that layer.
     Author: Benjamin Keefer
-    Version: February 14th, 2024
+    Version: February 15th, 2024
 """
 edges = []
 sequence = []
@@ -298,26 +298,26 @@ def number_of_hamiltonian_paths(show_steps):
 
     # Computes and prints number of arborescences for each vertex in the Line(Lay(n, k))
     # This is the left side of the BEST theorem equation
+    dets = []
     if show_steps:
         print("Determinants (# of arborescences):")
-    i = 0
-    dets = []
-    for arr in sub_arrays:
-        det = round(np.linalg.det(np.array(arr)))
-        if show_steps:
-            print(f"Vertex: {vertices[i]} Determinant: {det}")
-            print(np.array(arr))
-        
-        dets.append(det)
-        i += 1
-        if(i > 1):
-            if(dets[i - 1] != det):
-                raise Exception("Not all # of arborescences are the same, problem!")
-    
-    if show_steps:
+        i = 0
+        for arr in sub_arrays:
+            det = round(np.linalg.det(np.array(arr)))
+            if show_steps:
+                print(f"Vertex: {vertices[i]} Determinant: {det}")
+                print(np.array(arr))
+            
+            dets.append(det)
+            i += 1
+            if(i > 1):
+                if(dets[i - 1] != det):
+                    raise Exception("Not all # of arborescences are the same, problem!")
         print_line(l)
         print(f"Number of arborescences: {dets[0]}")
         print_line(l)
+    else:
+        dets.append(round(np.linalg.det(np.array(sub_arrays[0]))))
 
     # Prints interesting computations that are unnecessary for hamiltonian path computation
     show_optional = False
@@ -417,6 +417,7 @@ def main():
 
     # Computes number of hamiltonian paths efficiently: O(?)
     number_of_hamiltonian_paths(False) # change False to True for printing computational steps
+    
     # show_graph()
     return
 
