@@ -69,7 +69,6 @@ def load_edges():
 # Updates sequence to only contain a single layer of the "onion"
 def lay(x : int):
     global sequence
-    # Adds words in lay to seq
     sub_seq = []
     for word in sequence:
         in_word = False
@@ -97,24 +96,17 @@ def remove_zero_edges() -> list:
 
 # Converts list of graph edges into a dictionary of adjacency lists
 def adjacency_lists():
-    global sequence
+    global sequence, adjacency
+    adjacency.clear()
     for edge in sequence:
         if(edge[0] in adjacency):
             adjacency[edge[0]].append(edge[1])
         else:
             adjacency[edge[0]] = [edge[1]]
 
-# TODO: Write a backtracing algorithm to efficiently compute # of hamiltonian paths
-def num_of_paths_backtracing(start, end, print_paths, start_path) -> int:
-    pass
-
-# TODO: Determine if a shift construction of hamiltonian paths is possible
-def num_of_paths_rotations(start, end) -> int:
-    pass
-
 # Computes the number of hamiltonian paths in a layer of an onion de Bruijn sequence
 # If print_paths is True it will print those paths, otherwise it won't
-def num_of_paths(start, end, print_paths) -> int:
+def num_of_paths_greedy(start, end, print_paths) -> int:
     global num
     idx = 0
     all_paths = []
@@ -159,7 +151,7 @@ def endTimer():
 def dTime() -> float:
     return endTime - startTime #the change in time
 
-# TODO: Occ(n, k, r) graph where k-1 occurs r times
+# Occ(n, k, r) graph where k-1 occurs r times
 # Hypothesis: L(Occ(n, k, r)) = Occ(n+1, k, r+1)
 def occurences(r) -> list:
     global sequence
@@ -178,12 +170,11 @@ def occurences(r) -> list:
                 occ_2 += 1
         if occ_1 == r and occ_2 == r:
             removed.append(word)
-        # if not (word[0] == zero or word[1] == zero):
-        #     removed.append(word)
 
     sequence = removed
     return removed
 
+# Replaces the current graph with its line graph
 def line_graph() -> list:
     global sequence
     new_edges = []
@@ -191,20 +182,30 @@ def line_graph() -> list:
         for j in range(len(sequence)):
             if(sequence[i][1] == sequence[j][0]):
                 new_edges.append((sequence[i][0][1:] + "" + sequence[i][1][-1], sequence[i][1][1:] + "" + sequence[j][1][-1]))
-        
     sequence = new_edges
     unique()
+    return
+
+# Displays de Bruijn graph
+def show_graph():
+    global G
+    try:
+        nx.draw_planar(G, with_labels=True)
+    except:
+        nx.draw_spring(G, with_labels=True)
+    plt.show()
+    return
 
 # Prints whether or not this graph is Eulerian
 def graph_is_eulerian():
     global G
+    G.add_edges_from(sequence)
     in_degrees = list(G.in_degree)
     out_degrees = list(G.out_degree)
     eulerian = True
     for i in range(len(in_degrees)):
         if(in_degrees[i][0] != out_degrees[i][0]):
-            print("Problem, this shouldn't happen")
-            return
+            raise Exception("Invalid graph")
         if(in_degrees[i][1] != out_degrees[i][1]):
             eulerian = False
     if(eulerian):
@@ -213,7 +214,7 @@ def graph_is_eulerian():
         print(f"Line(Lay({n}, {k})) is NOT eulerian")
     return
 
-# Prints how many hamiltonian paths exist in the layer of the de Bruijn graph
+# Prints all hamiltonian paths that exist in the layer of the de Bruijn graph
 def find_hamiltonian_paths(lay_val):
     start_val = lay_val
     end_val = lay_val
@@ -231,7 +232,7 @@ def find_hamiltonian_paths(lay_val):
     print("end: " + end)
     startTimer()
 
-    paths = num_of_paths(start, end, False)
+    paths = num_of_paths_greedy(start, end, True)
 
     endTimer()
     print(dTime())
@@ -239,27 +240,13 @@ def find_hamiltonian_paths(lay_val):
     print("Number of vertices: " + str(len(adjacency)))
     return
 
-# Constructs and displays de Bruijn graph
-def show_graph():
-    global G
-
-    try:
-        nx.draw_planar(G, with_labels=True)
-    except:
-        nx.draw_spring(G, with_labels=True)
-
-    plt.show()
-    return
-
-def directed_incidence_matrix():
-    pass
-
 # Computes number of hamiltonian paths in Lay(n, k) in polynomial time
 def number_of_hamiltonian_paths(show_steps):
     global sequence, G, n
     
     # Gets the vertices in the graph
-    vertices = [v for v in G.nodes()]
+    adjacency_lists()
+    vertices = list(adjacency.keys())
     l_v = len(vertices)
     l = (l_v * (4 + n))
     
@@ -274,7 +261,6 @@ def number_of_hamiltonian_paths(show_steps):
         adj[vertices.index(edge[0])][vertices.index(edge[1])] = 1
         degrees[edge[1]] = degrees[edge[1]] + 1 # edge[1] for in-degrees, edge[0] for out degrees
         # degrees[edge[1]] = degrees[edge[1]] + 1 # uncomment to change to vertex degree
-        
 
     # Constructs degree matrix
     deg = [[0 for _ in range(l_v)] for _ in range(l_v)]
@@ -286,10 +272,6 @@ def number_of_hamiltonian_paths(show_steps):
     # Constructs Laplacian matrix
     laplacian = [[(deg[i][j] - adj[i][j]) for j in range(l_v)] for i in range(l_v)]
     sub_arrays = produce_sub_arrays(laplacian)
-
-    # Computes eigenvalues
-    eigenvalues = np.linalg.eigvals(np.array(laplacian))
-    show_eigenvalues = False
 
     def print_line(l):
         print("=" * l)
@@ -314,7 +296,8 @@ def number_of_hamiltonian_paths(show_steps):
             print()
         print_line(l)
 
-    
+    # Computes and prints number of arborescences for each vertex in the Line(Lay(n, k))
+    # This is the left side of the BEST theorem equation
     if show_steps:
         print("Determinants (# of arborescences):")
     i = 0
@@ -329,28 +312,30 @@ def number_of_hamiltonian_paths(show_steps):
         i += 1
         if(i > 1):
             if(dets[i - 1] != det):
-                print("Not all # of arborescences are the same, problem!")
-
+                raise Exception("Not all # of arborescences are the same, problem!")
+    
     if show_steps:
-        show_laplacian_determinant = False
-        if show_laplacian_determinant:
-            print_line(l)
-            print(f"Det(Laplacian(Line(Lay({n}, {k})))) = {np.linalg.det(np.array(laplacian))}")
-
-        if show_eigenvalues:
-            print("Eigenvalues:")
-            for val in eigenvalues:
-                if(val.imag > 0.0):
-                    print(f"{val.real} + {val.imag}i")
-                elif(val.imag < 0.0):
-                    print(f"{val.real} - {abs(val.imag)}i")
-                else:
-                    print(f"{val.real}")
         print_line(l)
         print(f"Number of arborescences: {dets[0]}")
         print_line(l)
-    
-    degree_product = 0
+
+    # Prints interesting computations that are unnecessary for hamiltonian path computation
+    show_optional = False
+    if show_steps and show_optional:
+        print_line(l)
+        print(f"Det(Laplacian(Line(Lay({n}, {k})))) = {np.linalg.det(np.array(laplacian))}")
+        print("Eigenvalues of the laplacian:")
+        eigenvalues = np.linalg.eigvals(np.array(laplacian))
+        for val in eigenvalues:
+            if(val.imag > 0.0):
+                print(f"{val.real} + {val.imag}i")
+            elif(val.imag < 0.0):
+                print(f"{val.real} - {abs(val.imag)}i")
+            else:
+                print(f"{val.real}")
+        
+    # Computes the right side of the BEST theorem equation
+    degree_product = 1
     i = 0
     for v in vertices:
         if i == 0:
@@ -363,10 +348,11 @@ def number_of_hamiltonian_paths(show_steps):
     if show_steps:
         print(f"# of paths = number of arborescences * product((degree(v) - 1)! where v is a vertex in the Lay({n}, {k})) graph")
         print_line(l)
-    print(f"Number of hamiltonian paths in Line(Lay({n}, {k})): {dets[0] * degree_product}")
+
+    print(f"Number of hamiltonian paths in Lay({n}, {k}) = {dets[0] * degree_product}")
     return
 
-# Removes duplicate edges from the sequence
+# Removes duplicate edges from the graph
 def unique():
     global sequence
     new_sequence = []
@@ -378,7 +364,7 @@ def unique():
     sequence = new_sequence
     return
 
-# Generates sub arrays such that the ith row and ith column are removed
+# Generates all sub arrays where the ith row and ith column are removed
 def produce_sub_arrays(arr) -> list:
     sub = []
     for i in range(len(arr)):
@@ -424,14 +410,12 @@ def main():
     unique()
     adjacency_lists()
     line_graph()
-
+    # graph_is_eulerian() # Confirms that Line(Lay(n, k)) is eulerian for n > 2
     
-    graph_is_eulerian()
-    
-    G.add_edges_from(sequence)
+    # # Greedy algorithm for enumerating all hamiltonian paths in the graph
     # find_hamiltonian_paths(lay_val) # O(v!)
 
-    # Find number of hamiltonian paths O(?)
+    # Computes number of hamiltonian paths efficiently: O(?)
     number_of_hamiltonian_paths(False) # change False to True for printing computational steps
     # show_graph()
     return
@@ -440,5 +424,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except:
-        print("Invalid input")
+    except Exception as e:
+        print(f"Error: {e}")
