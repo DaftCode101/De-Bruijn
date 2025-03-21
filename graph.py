@@ -5,15 +5,18 @@ import math as m
 import time as t
 
 """
-    Visualizer for de Bruijn graphs. Contains functions for dispaying
-    a specific (onion) layer of a de Bruijn graph as well as efficiently
-    computing number of hamiltonian paths in that layer.
+    Math research code.
+    Contains functions for dispaying a specific (onion) layer of a 
+    de Bruijn graph and efficiently computing the number of hamiltonian
+    paths in that layer.
+
     Author: Benjamin Keefer
-    Version: March 5th, 2024
+    Version: March 20th, 2024
 """
 edges = []
 sequence = []
 adjacency = {}
+vertices = []
 G = nx.DiGraph()
 startTime = 0
 endTime = 0
@@ -174,17 +177,6 @@ def occurences(r) -> list:
     sequence = removed
     return removed
 
-# Replaces the current graph with its line graph
-def line_graph() -> list:
-    global sequence
-    new_edges = []
-    for i in range(len(sequence)):
-        for j in range(len(sequence)):
-            if(sequence[i][1] == sequence[j][0]):
-                new_edges.append((f"{sequence[i][0][1:]}{sequence[i][1][-1]}", f"{sequence[i][1][1:]}{sequence[j][1][-1]}"))
-    sequence = new_edges
-    unique()
-    return
 
 # Displays de Bruijn graph
 def show_graph():
@@ -197,9 +189,10 @@ def show_graph():
     return
 
 # Prints whether or not this graph is Eulerian
-def graph_is_eulerian():
+def graph_is_eulerian(print_bool : bool):
     global G
     G.add_edges_from(sequence)
+    global vertices
     vertices = []
     for node in G.nodes:
         vertices.append(node)
@@ -207,15 +200,18 @@ def graph_is_eulerian():
     out_degrees = list(G.out_degree)
     eulerian = True
     for i in range(len(in_degrees)):
-        print(f"Vertex: {vertices[i]} In: {in_degrees[i][1]}, Out: {out_degrees[i][1]}")
+        if(print_bool):
+            print(f"Vertex: {vertices[i]} In: {in_degrees[i][1]}, Out: {out_degrees[i][1]}")
         if(in_degrees[i][0] != out_degrees[i][0]):
             raise Exception("Invalid graph")
         if(in_degrees[i][1] != out_degrees[i][1]):
             eulerian = False
+    if not print_bool:
+        return
     if(eulerian):
-        print(f"Line(Lay({n}, {k})) is eulerian")
+        print(f"Kee(Lay({n}, {k})) is eulerian")
     else:
-        print(f"Line(Lay({n}, {k})) is NOT eulerian")
+        print(f"Kee(Lay({n}, {k})) is NOT eulerian")
     return
 
 # Prints all hamiltonian paths that exist in the layer of the de Bruijn graph
@@ -244,8 +240,15 @@ def find_hamiltonian_paths(lay_val):
     print("Number of vertices: " + str(len(adjacency)))
     return
 
+# Approximation of determinant using eigenvalues
+def eigenvals_approximation(arr) -> int:
+    eigenvalues = np.linalg.eigvals(np.array(arr))
+    product = 1
+    for val in eigenvalues: product *= float(val.real)
+    return round(product)
+
 # Computes number of hamiltonian paths in Lay(n, k) in polynomial time
-def number_of_hamiltonian_paths(show_steps):
+def number_of_hamiltonian_paths(hide_steps):
     global sequence, G, n
     
     # Gets the vertices in the graph
@@ -282,7 +285,7 @@ def number_of_hamiltonian_paths(show_steps):
 
     # Prints the vertices, the adjacency matrix, the degree matrix,
     # and the laplacian matrix
-    if show_steps:
+    if not hide_steps:
         print(f"Vertices in the graph: \n{vertices}")
         print_line(l)
 
@@ -303,35 +306,17 @@ def number_of_hamiltonian_paths(show_steps):
     # Computes and prints number of arborescences for each vertex in the Line(Lay(n, k))
     # This is the left side of the BEST theorem equation
     dets = []
-    if show_steps:
+    if hide_steps:
+        dets.append(round(np.linalg.det(np.array(sub_arrays[0]))))
+    else:
         print("Determinants (# of arborescences):")
         i = 0
         for arr in sub_arrays:
             det = round(np.linalg.det(np.array(arr)))
             dets.append(det)
-            if show_steps:
-                # # Approximation of determinant with eigenvalues
-                # eigenvalues = np.linalg.eigvals(np.array(arr))
-                # product = 1
-                # all_real = True
-                # for val in eigenvalues:
-                #     if(val.imag > 0.0):
-                #         print(f"{val.real} + {val.imag}i")
-                #         all_real = False
-                #     elif(val.imag < 0.0):
-                #         print(f"{val.real} - {abs(val.imag)}i")
-                #         all_real = False
-                #     else:
-                #         print(f"{val.real}")
-                #     product *= float(val.real)
-                # if all_real:
-                #     print("All eigenvalues were real")
-                # product = round(product)
-                # print(f"Vertex: {vertices[i]} Determinant: {product}")
-            # dets.append(product)
+            if hide_steps:
                 print(f"Vertex: {vertices[i]} Determinant: {dets[0]}")
                 print(np.array(arr))
-            
             i += 1
             if(i > 1):
                 if(dets[i - 2] != dets[i - 1]):
@@ -339,16 +324,10 @@ def number_of_hamiltonian_paths(show_steps):
         print_line(l)
         print(f"Number of arborescences: {dets[0]}")
         print_line(l)
-    else:
-        dets.append(round(np.linalg.det(np.array(sub_arrays[0]))))
-        # eigenvalues = np.linalg.eigvals(np.array(sub_arrays[0]))
-        # product = 1
-        # for val in eigenvalues: product *= float(val.real)
-        # dets.append(round(product))
 
     # Prints interesting computations that are unnecessary for hamiltonian path computation
     show_optional = False
-    if show_steps and show_optional:
+    if (not hide_steps) and show_optional:
         print_line(l)
         print(f"Det(Laplacian(Line(Lay({n}, {k})))) = {np.linalg.det(np.array(laplacian))}")
         print("Eigenvalues of the laplacian:")
@@ -366,7 +345,7 @@ def number_of_hamiltonian_paths(show_steps):
     for v in vertices:
         degree_product *= m.factorial(degrees[v] - 1)
 
-    if show_steps:
+    if not hide_steps:
         print(f"# of paths = number of arborescences * product((degree(v) - 1)! where v is a vertex in the Lay({n}, {k})) graph")
         print_line(l)
 
@@ -410,6 +389,31 @@ def produce_sub_arrays(arr) -> list:
         sub.append(sub_arr)
     return sub
 
+# Returns the vertices of the given graph
+def get_vertices(graph : list) -> list:
+    vertices = set()
+    for i in range(2):
+        for j in range(len(graph)):
+            vertices.add(graph[j][i])
+    return list(vertices)
+
+# Replaces the current graph with its line graph
+def kee_graph() -> list:
+    global sequence
+    new_edges = []
+    # TODO: Check other way, construct vertices first and then edges
+
+    # Iterates over V x V
+    for i in range(len(sequence)):
+        for j in range(len(sequence)):
+            if(sequence[i][1] == sequence[j][0]):
+                first_vertex = f"{sequence[i][1][-1]}{sequence[i][0][1:]}"
+                second_vertex = f"{sequence[j][1][-1]}{sequence[i][1][1:]}"
+                new_edges.append((first_vertex, second_vertex))
+    sequence = new_edges
+    unique()
+    return
+
 # Main method
 def main():
     global k, n, sequence
@@ -418,8 +422,9 @@ def main():
     n = int(input("Enter n: "))
     k = int(input("Enter k: "))
     lay_val = k - 1
-    lay_bool = str(input("Lay? (y/n) "))
-    lay_bool = lay_bool.lower()
+    lay_bool = "y"
+    # lay_bool = str(input("Lay? (y/n) "))
+    # lay_bool = lay_bool.lower()
 
     # Generates de Bruijn sequence
     de_bruijn(k, n)
@@ -433,19 +438,36 @@ def main():
     remove_zero_edges()
     unique()
     adjacency_lists()
-    line_graph()
-    graph_is_eulerian() # Confirms that Line(Lay(n, k)) is eulerian for n > 2
-    
+
+    # global G
+    # G.add_edges_from(sequence)
+    # print("vertices: " + str(len(G.nodes)))
+    # print("edges: " + str(len(G.edges)))
+
+    print(f"# of vertices in Lay(DB(n, k)): {len(get_vertices(sequence))}")
+    print(f"# of edges in Lay(DB(n, k)): {len(sequence)}")
+
+    # startTimer()
     # # Greedy algorithm for enumerating all hamiltonian paths in the graph
     # find_hamiltonian_paths(lay_val) # O(v!)
+    # endTimer()
+    # print(dTime())
+
+    # TODO: Figure out why kee function output is not eulerian for k > 10?
+    kee_graph()
+    print(f"# of vertices in Kee(Lay(DB(n, k))): {len(get_vertices(sequence))}")
+    print(f"# of edges in Kee(Lay(DB(n, k))): {len(sequence)}")
+    graph_is_eulerian(True) # Checks if Kee(Lay(n, k)) is eulerian for n > 2
 
     # Computes number of hamiltonian paths efficiently: O(?)
     startTimer()
-    number_of_hamiltonian_paths(True) # change False to True for printing computational steps
+    number_of_hamiltonian_paths(True) # change True to False for printing computational steps
     endTimer()
-    # print(dTime())
-    show_graph()
-    # TODO: Prove the in/out degree of a vertex in LDB(n, k) is either 1 or k
+    print(dTime())
+
+    # global G
+    # G.add_edges_from(sequence)
+    # show_graph()
     return
 
 # Calls main
