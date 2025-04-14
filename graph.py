@@ -11,7 +11,7 @@ import time as t
     paths in that layer.
 
     Author: Benjamin Keefer
-    Version: March 20th, 2024
+    Version: March 5th, 2024
 """
 edges = []
 sequence = []
@@ -49,10 +49,20 @@ def de_bruijn(k_val: int, n_val: int):
     global n
     k = k_val
     n = n_val
-    s = [0 for i in range(n)]
+    s = [0 for _ in range(n)]
     for i in range(k ** n):
         sequence.append(s)
         s = shift(s)
+
+# Extends the alphabet beyond 0-9
+def char(x : int):
+    if x < 10:
+        return str(x)
+    elif x < 36:
+        return str(chr(x + 87))
+    elif x < 62:
+        return str(chr(x + 29))
+    return str(chr(x + 113))
 
 # Generates edge pairs from the de Bruijn sequence
 def load_edges():
@@ -66,7 +76,7 @@ def load_edges():
                 if(word[i] != other_word[i+1]):
                     add = False
             if(add):
-                edges.append(("".join(str(num) for num in word), "".join(str(num) for num in other_word)))
+                edges.append(("".join(char(num) for num in word), "".join(char(num) for num in other_word)))
     sequence = edges
 
 # Updates sequence to only contain a single layer of the "onion"
@@ -102,10 +112,10 @@ def adjacency_lists():
     global sequence, adjacency
     adjacency.clear()
     for edge in sequence:
-        if(edge[0] in adjacency):
-            adjacency[edge[0]].append(edge[1])
-        else:
+        if edge[0] not in adjacency:
             adjacency[edge[0]] = [edge[1]]
+        else:
+            adjacency[edge[0]].append(edge[1])
 
 # Computes the number of hamiltonian paths in a layer of an onion de Bruijn sequence
 # If print_paths is True it will print those paths, otherwise it won't
@@ -181,12 +191,34 @@ def occurences(r) -> list:
 # Displays de Bruijn graph
 def show_graph():
     global G
+    G.add_edges_from(sequence)
     try:
         nx.draw_planar(G, with_labels=True)
     except:
         nx.draw_spring(G, with_labels=True)
     plt.show()
     return
+
+def remove_deg_one():
+    global G, sequence, vertices
+    G.add_edges_from(sequence)
+    vertices = []
+    for node in G.nodes:
+        vertices.append(node)
+    in_degrees = list(G.in_degree)
+    ver = set()
+    for i in range(len(in_degrees)):
+        print(in_degrees[i][1])
+        if in_degrees[i][1] == 1:
+            ver.add(vertices[i])
+    removed_sequence = []
+    for edge in sequence:
+        if edge[0] in ver or edge[1] in ver:
+            continue
+        removed_sequence.append(edge)
+    print(f"Number of vertices with in-deg 1: {len(ver)}")
+    sequence = removed_sequence
+    G.add_edges_from(sequence)
 
 # Prints whether or not this graph is Eulerian
 def graph_is_eulerian(print_bool : bool):
@@ -196,8 +228,10 @@ def graph_is_eulerian(print_bool : bool):
     vertices = []
     for node in G.nodes:
         vertices.append(node)
+
     in_degrees = list(G.in_degree)
     out_degrees = list(G.out_degree)
+
     eulerian = True
     for i in range(len(in_degrees)):
         if(print_bool):
@@ -356,17 +390,22 @@ def number_of_hamiltonian_paths(hide_steps):
     return
 
 # Removes duplicate edges from the graph
-def unique():
-    global sequence
+def unique(graph, swap) -> list:
     new_sequence = []
     s = set()
-    for seq in sequence:
+
+    for seq in graph:
         if not s.__contains__(seq):
             s.add(seq)
             new_sequence.append(seq)
-    sequence = new_sequence
-    return
 
+    if swap:
+        global sequence
+        sequence = new_sequence
+
+    return new_sequence
+
+    
 # Generates all sub arrays where the ith row and ith column are removed
 def produce_sub_arrays(arr) -> list:
     sub = []
@@ -397,11 +436,21 @@ def get_vertices(graph : list) -> list:
             vertices.add(graph[j][i])
     return list(vertices)
 
-# Replaces the current graph with its line graph
-def kee_graph() -> list:
+"""
+For an edge of the form ((tao)x(sigma)(phi), (gamma)(tao)x(sigma)), the corresponding vertex
+in the keefer graph is of the form (sigma)x(sigma)(phi). Edge choices are the same as the line graph
+except you have to remove repeated edges. For s in Lay(DB(n, k)) s.t. k > 2, the number of
+number of vertices in s is equal to the edges in s's keefer graph . Additionally, the number
+of vertices in keefer(s) is less than the number of vertices in s.
+Interestingly, the number of hamiltonian cycles in s equals the number of eulerian cycles in kee(s).
+
+Notes: For an edge in s, the corresponding vertex in kee(s) can be constructed purely from the
+first vertex in the edge. This means that all pairs of edges in s of the form ((x, y), (y, z)),
+z in [k]^n, produce equivalent edges in kee(s) that don't depend on z.
+"""
+def kee_v1():
     global sequence
     new_edges = []
-    # TODO: Check other way, construct vertices first and then edges
 
     # Iterates over V x V
     for i in range(len(sequence)):
@@ -411,8 +460,41 @@ def kee_graph() -> list:
                 second_vertex = f"{sequence[j][1][-1]}{sequence[i][1][1:]}"
                 new_edges.append((first_vertex, second_vertex))
     sequence = new_edges
-    unique()
+    unique(sequence, True)
     return
+
+"""
+Generalizes Keefer Graph construction to other graphs
+"""
+def kee_graph() -> list:
+    adjacency_lists()
+    d = dict()
+    pk = 0
+
+    kee = []
+    for x in adjacency.items():
+        v = x[0]
+
+        if not d.__contains__(v):
+            d[v] = str(pk)
+            pk += 1
+
+        pk_used = False
+        a = x[1]
+        for w in a:
+            if not d.__contains__(w):
+                d[w] = pk
+                pk_used = True
+            kee.append((str(d[v]), str(d[w])))
+
+        if pk_used:
+            pk += 1
+
+    kee = unique(kee, False)
+
+    global sequence
+    sequence = kee
+    return kee
 
 # Main method
 def main():
@@ -436,7 +518,7 @@ def main():
     # Constructs layer of the de Bruijn graph
     load_edges()
     remove_zero_edges()
-    unique()
+    unique(sequence, True)
     adjacency_lists()
 
     # global G
@@ -444,29 +526,41 @@ def main():
     # print("vertices: " + str(len(G.nodes)))
     # print("edges: " + str(len(G.edges)))
 
-    print(f"# of vertices in Lay(DB(n, k)): {len(get_vertices(sequence))}")
-    print(f"# of edges in Lay(DB(n, k)): {len(sequence)}")
-
     # startTimer()
     # # Greedy algorithm for enumerating all hamiltonian paths in the graph
-    # find_hamiltonian_paths(lay_val) # O(v!)
+    find_hamiltonian_paths(lay_val) # O(v!)
     # endTimer()
     # print(dTime())
 
-    # TODO: Figure out why kee function output is not eulerian for k > 10?
+    original_vertices = len(get_vertices(sequence))
+
+    print(sequence)
+
+    # kee_v1()
     kee_graph()
-    print(f"# of vertices in Kee(Lay(DB(n, k))): {len(get_vertices(sequence))}")
-    print(f"# of edges in Kee(Lay(DB(n, k))): {len(sequence)}")
+    
+    
+    l = 50
+    print("-" * l)
+    
+    if(original_vertices == len(sequence)):
+        print(f"|V(Lay(n, k))| = |E(Kee(Lay(n, k)))|")
+    else:
+        print(f"|V(Lay(n, k))| != |E(Kee(Lay(n, k)))|")
+
+    # print(f"# of vertices in Kee(Lay(DB({n}, {k}))): {len(get_vertices(sequence))}")
+    # print(f"# of edges in Kee(Lay(DB({n}, {k}))): {len(sequence)}")
+    # remove_deg_one()
     graph_is_eulerian(True) # Checks if Kee(Lay(n, k)) is eulerian for n > 2
+    print("-" * l)
 
     # Computes number of hamiltonian paths efficiently: O(?)
     startTimer()
     number_of_hamiltonian_paths(True) # change True to False for printing computational steps
     endTimer()
-    print(dTime())
+    print("-" * l)
+    print(f"{dTime():.5f} seconds for path computation")
 
-    # global G
-    # G.add_edges_from(sequence)
     # show_graph()
     return
 
