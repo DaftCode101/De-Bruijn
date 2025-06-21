@@ -11,18 +11,9 @@ import time as t
     paths in that layer.
 
     Author: Benjamin Keefer
-    Version: March 5th, 2024
+    Version: June 20th, 2024
 """
-edges = []
-sequence = []
-adjacency = {}
-vertices = []
-G = nx.DiGraph()
-startTime = 0
-endTime = 0
-num = 0
-k = 2
-n = 2
+
 
 # De Bruijn generation code from amirrubin87 on github
 def val(s):
@@ -109,13 +100,13 @@ def remove_zero_edges() -> list:
 
 # Converts list of graph edges into a dictionary of adjacency lists
 def adjacency_lists():
-    global sequence, adjacency
-    adjacency.clear()
+    global sequence, ldb
+    ldb.clear()
     for edge in sequence:
-        if edge[0] not in adjacency:
-            adjacency[edge[0]] = [edge[1]]
+        if edge[0] not in ldb:
+            ldb[edge[0]] = [edge[1]]
         else:
-            adjacency[edge[0]].append(edge[1])
+            ldb[edge[0]].append(edge[1])
 
 # Computes the number of hamiltonian paths in a layer of an onion de Bruijn sequence
 # If print_paths is True it will print those paths, otherwise it won't
@@ -125,7 +116,7 @@ def num_of_paths_greedy(start, end, print_paths) -> int:
     all_paths = []
     
     visited = {}
-    for edge in list(adjacency.keys()):
+    for edge in list(ldb.keys()):
         visited[edge] = False
 
     def dfs(current_path, current_vertex, print_paths):
@@ -138,7 +129,7 @@ def num_of_paths_greedy(start, end, print_paths) -> int:
         elif current_vertex == end:
             return
         visited[current_vertex] = True
-        for neighbor in adjacency[current_vertex]:
+        for neighbor in ldb[current_vertex]:
             if not visited[neighbor]:
                 current_path.append(neighbor)
                 dfs(current_path, neighbor, print_paths)
@@ -164,34 +155,35 @@ def endTimer():
 def dTime() -> float:
     return endTime - startTime #the change in time
 
-# Occ(n, k, r) graph where k-1 occurs r times
-# Hypothesis: L(Occ(n, k, r)) = Occ(n+1, k, r+1)
-def occurences(r) -> list:
-    global sequence
-    removed = []
-
-    for word in edges:
-        occ_1 = 0
-        occ_2 = 0
-        split = list(word[0])
-        split2 = list(word[1])
-        for i in range(len(split)):
-            if(split[i] == str(k - 1)):
-                occ_1 += 1
-        for i in range(len(split2)):
-            if(split2[i] == str(k - 1)):
-                occ_2 += 1
-        if occ_1 == r and occ_2 == r:
-            removed.append(word)
-
-    sequence = removed
-    return removed
-
-
 # Displays de Bruijn graph
 def show_graph():
     global G
+    G = nx.DiGraph()
     G.add_edges_from(sequence)
+    total_vertices = 0
+    num_of_ones_in = 0
+    num_of_ks_in = 0
+    num_of_ones_out = 0
+    num_of_ks_out = 0
+    for node in G.nodes:
+        total_vertices += 1
+        indeg = G.in_degree(node)
+        outdeg = G.out_degree(node)
+        if indeg == 1: num_of_ones_in += 1
+        if indeg == k: num_of_ks_in += 1
+        if outdeg == 1: num_of_ones_out += 1
+        if outdeg == k: num_of_ks_out += 1
+        if indeg != outdeg:
+            print("Graph is not eulerian!")
+    print(f"Number of vertices with in-degree and out-degree of one: {num_of_ones_in}")
+    assert(num_of_ones_in == num_of_ones_out)
+    assert(num_of_ones_in == ((k-1) ** (n-1)))
+    print(f"Number of vertices with in-degree and out-degree of k: {num_of_ks_in}")
+    assert(num_of_ks_in == num_of_ks_out)
+    assert(num_of_ks_in == ((k ** (n-1)) - ((k-1) ** (n-1))))
+    print(f"Total number of vertices: {total_vertices}")
+    assert(k ** (n-1) == total_vertices)
+    
     try:
         nx.draw_planar(G, with_labels=True)
     except:
@@ -249,7 +241,7 @@ def graph_is_eulerian(print_bool : bool):
     return
 
 # Prints all hamiltonian paths that exist in the layer of the de Bruijn graph
-def find_hamiltonian_paths(lay_val):
+def find_hamiltonian_paths(lay_val) -> int:
     start_val = lay_val
     end_val = lay_val
     if lay_val == 0:
@@ -261,18 +253,9 @@ def find_hamiltonian_paths(lay_val):
         start += "0"
         end += "0"
     end += str(end_val)
-
-    print("start: " + start)
-    print("end: " + end)
-    startTimer()
-
     paths = num_of_paths_greedy(start, end, False)
-
-    endTimer()
-    print(dTime())
-    print("Number of hamiltonian paths: " + str(paths))
-    print("Number of vertices: " + str(len(adjacency)))
-    return
+    print(f"Number of hamiltonian cycles in a ({n}, {k}) de Bruijn graph: " + str(paths))
+    return paths
 
 # Approximation of determinant using eigenvalues
 def eigenvals_approximation(arr) -> int:
@@ -287,7 +270,7 @@ def number_of_hamiltonian_paths(hide_steps):
     
     # Gets the vertices in the graph
     adjacency_lists()
-    vertices = list(adjacency.keys())
+    vertices = list(ldb.keys())
     l_v = len(vertices)
     l = (l_v * (4 + n))
     
@@ -341,7 +324,8 @@ def number_of_hamiltonian_paths(hide_steps):
     # This is the left side of the BEST theorem equation
     dets = []
     if hide_steps:
-        dets.append(round(np.linalg.det(np.array(sub_arrays[0]))))
+        print(f"Number of arborescences in Kee({n}, {k}): {round(np.linalg.det(np.array(sub_arrays[0])))}")
+        dets.append(np.linalg.det(np.array(sub_arrays[0])))
     else:
         print("Determinants (# of arborescences):")
         i = 0
@@ -377,19 +361,35 @@ def number_of_hamiltonian_paths(hide_steps):
     # Computes the right side of the BEST theorem equation
     degree_product = 1
     for v in vertices:
+        # print(f"{v} contributes {degrees[v] - 1}")
         degree_product *= m.factorial(degrees[v] - 1)
 
     if not hide_steps:
         print(f"# of paths = number of arborescences * product((degree(v) - 1)! where v is a vertex in the Lay({n}, {k})) graph")
         print_line(l)
 
+    if not (dets[0] % 1 > 0.999 or dets[0] % 1 < 0.001):
+        print(dets[0])
+        print(dets[0] % 1)
+        raise Exception("Determinant computation has floating point value so number of paths computation can't be relied on!")
+    else:
+        dets[0] = round(dets[0])
+    
     num_of_paths = dets[0] * degree_product
-    print(f"Number of hamiltonian paths in Lay({n}, {k}) = {num_of_paths:,}")
+
+    try:
+        assert(num_of_paths == (((m.factorial(k))**((k**(n-1))-((k-1)**(n-1))))) / (k**(n-1)))
+    except:
+        print(num_of_paths)
+        print(int(((m.factorial(k))**((k**(n-1))-((k-1)**(n-1))))) / (k**(n-1)))
+        raise Exception("Floating point in determinate computation breaking equivalence")
+
+    print(f"Number of eulerian cycles in Kee({n}, {k}) = {num_of_paths}")
     if num_of_paths > 0 and int(m.log10(num_of_paths)+1) > 6:
         print(f"or\napproximately {num_of_paths / (10 ** int(m.log10(num_of_paths))):.1f}e+{int(m.log10(num_of_paths))}")
     return
 
-# Removes duplicate edges from the graph
+# Removes duplicate edges from a graph
 def unique(graph, swap) -> list:
     new_sequence = []
     s = set()
@@ -404,7 +404,6 @@ def unique(graph, swap) -> list:
         sequence = new_sequence
 
     return new_sequence
-
     
 # Generates all sub arrays where the ith row and ith column are removed
 def produce_sub_arrays(arr) -> list:
@@ -437,136 +436,110 @@ def get_vertices(graph : list) -> list:
     return list(vertices)
 
 """
-For an edge of the form ((tao)x(sigma)(phi), (gamma)(tao)x(sigma)), the corresponding vertex
-in the keefer graph is of the form (sigma)x(sigma)(phi). Edge choices are the same as the line graph
-except you have to remove repeated edges. For s in Lay(DB(n, k)) s.t. k > 2, the number of
-number of vertices in s is equal to the edges in s's keefer graph . Additionally, the number
-of vertices in keefer(s) is less than the number of vertices in s.
-Interestingly, the number of hamiltonian cycles in s equals the number of eulerian cycles in kee(s).
+Constructs the Key Graph of LDB(n, k) where LDB(n, k) = ldb is
+a dictionary that maps each vertex in LDB(n, k) to a list of all
+vertices that it has an edge going out to.
 
-Notes: For an edge in s, the corresponding vertex in kee(s) can be constructed purely from the
-first vertex in the edge. This means that all pairs of edges in s of the form ((x, y), (y, z)),
-z in [k]^n, produce equivalent edges in kee(s) that don't depend on z.
+Returns Key(LDB(n, k)) as a set of edges.
 """
-def kee_v1():
-    global sequence
-    new_edges = []
+def key() -> set:
+    key = set()
+    labeled_vertices = dict()
+    pk = 0 # arbitrary use of primary key to label vertices
 
-    # Iterates over V x V
-    for i in range(len(sequence)):
-        for j in range(len(sequence)):
-            if(sequence[i][1] == sequence[j][0]):
-                first_vertex = f"{sequence[i][1][-1]}{sequence[i][0][1:]}"
-                second_vertex = f"{sequence[j][1][-1]}{sequence[i][1][1:]}"
-                new_edges.append((first_vertex, second_vertex))
-    sequence = new_edges
-    unique(sequence, True)
-    return
+    for neighborhood in ldb.items():
+        vertex = neighborhood[0]
 
-"""
-Generalizes Keefer Graph construction to other graphs
-"""
-def kee_graph() -> list:
-    adjacency_lists()
-    d = dict()
-    pk = 0
-
-    kee = []
-    for x in adjacency.items():
-        v = x[0]
-
-        if not d.__contains__(v):
-            d[v] = str(pk)
+        # Labels current vertex if it has not been labeled yet  
+        if not labeled_vertices.__contains__(vertex):
+            labeled_vertices[vertex] = str(pk)
             pk += 1
-
+        
+        # Labels the adjacent vertices if they have not been labeled yet
         pk_used = False
-        a = x[1]
-        for w in a:
-            if not d.__contains__(w):
-                d[w] = pk
+        for adjacent_vertex in neighborhood[1]:
+            if not labeled_vertices.__contains__(adjacent_vertex):
+                labeled_vertices[adjacent_vertex] = pk
                 pk_used = True
-            kee.append((str(d[v]), str(d[w])))
 
+        """
+        Adds an edge between the current vertex and the 
+        vertex of the last-labeled adjacent vertex.
+        """
+        key.add((str(labeled_vertices[vertex]),\
+                 str(labeled_vertices[adjacent_vertex])))
+
+        # Increments labeling key
         if pk_used:
             pk += 1
 
-    kee = unique(kee, False)
-
     global sequence
-    sequence = kee
-    return kee
+    sequence = key
+    print(f"Key has {len(key)} edges")
+    assert(len(key) == ((k**n)-((k-1)**n)))
 
-# Main method
-def main():
-    global k, n, sequence
-    
-    # Gathers parameters for the sequence
-    n = int(input("Enter n: "))
-    k = int(input("Enter k: "))
+    # Returns Key(LDB(n, k)) represented as a set of edges.
+    return key
+
+def degrees(new_k : int):
+    global n, k
+    k = new_k
+    print(f"n: {n}, k: {k}")
     lay_val = k - 1
-    lay_bool = "y"
-    # lay_bool = str(input("Lay? (y/n) "))
-    # lay_bool = lay_bool.lower()
-
-    # Generates de Bruijn sequence
     de_bruijn(k, n)
 
     # Updates sequence according to lay
-    if(lay_bool == "y"):
-        lay(lay_val)
 
+    lay(lay_val)
     # Constructs layer of the de Bruijn graph
     load_edges()
+    
     remove_zero_edges()
     unique(sequence, True)
     adjacency_lists()
-
-    # global G
-    # G.add_edges_from(sequence)
-    # print("vertices: " + str(len(G.nodes)))
-    # print("edges: " + str(len(G.edges)))
-
-    # startTimer()
-    # # Greedy algorithm for enumerating all hamiltonian paths in the graph
-    find_hamiltonian_paths(lay_val) # O(v!)
-    # endTimer()
-    # print(dTime())
-
-    original_vertices = len(get_vertices(sequence))
-
-    print(sequence)
-
-    # kee_v1()
-    kee_graph()
+    # find_hamiltonian_paths(lay_val) # O(v!)
+    # kee()
     
+
+    print_edges = False
+    if print_edges:
+        for w in sequence:
+                print(w)
+
+    # find_hamiltonian_paths(lay_val) # O(v!)
     
-    l = 50
-    print("-" * l)
-    
-    if(original_vertices == len(sequence)):
-        print(f"|V(Lay(n, k))| = |E(Kee(Lay(n, k)))|")
-    else:
-        print(f"|V(Lay(n, k))| != |E(Kee(Lay(n, k)))|")
+    key()
+    number_of_hamiltonian_paths(True)
 
-    # print(f"# of vertices in Kee(Lay(DB({n}, {k}))): {len(get_vertices(sequence))}")
-    # print(f"# of edges in Kee(Lay(DB({n}, {k}))): {len(sequence)}")
-    # remove_deg_one()
-    graph_is_eulerian(True) # Checks if Kee(Lay(n, k)) is eulerian for n > 2
-    print("-" * l)
+    # if print_edges:
+    #     for w in sequence:
+    #         print(w)
 
-    # Computes number of hamiltonian paths efficiently: O(?)
-    startTimer()
-    number_of_hamiltonian_paths(True) # change True to False for printing computational steps
-    endTimer()
-    print("-" * l)
-    print(f"{dTime():.5f} seconds for path computation")
+    show_graph()
 
-    # show_graph()
+def reset_state():
+    global n, k, edges, ldb, vertices, sequence
+    global startTime, endTime, num
+    edges = []
+    sequence = []
+    ldb = {}
+    vertices = []
+    G = nx.DiGraph()
+    startTime = 0
+    endTime = 0
+    num = 0
+    # Adjust initial n and k here
+    n = 3
+    k = 3
+
+# Main method
+def main():
+    reset_state()
+    global k
+    for i in range(k, k + 3):
+        reset_state()
+        degrees(i)
     return
 
-# Calls main
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"Error: {e}")
+    main()
