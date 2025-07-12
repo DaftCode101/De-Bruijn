@@ -565,7 +565,7 @@ def reset_state():
 def main():
     reset_state()
     global n, k
-    for i in range(k, k + 6):
+    for i in range(k, k + 4):
         reset_state()
         check_key_line_isomorphism(n, i)
     return
